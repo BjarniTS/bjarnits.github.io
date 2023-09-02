@@ -53,15 +53,7 @@ function render() {
 
     var num_tris = 100;
     for(var i = 0; i < num_tris; ++i) {
-      /*var center_x = (Math.random()*2)-1;
-      var center_y = (Math.random()*2)-1;*/
       gl.uniform2fv( centerLoc, vec2(Math.random()*2, Math.random()*2));
-      /*vertices[0] = center_x - size;
-      vertices[1] = center_y - size;
-      vertices[2] = center_x + size;
-      vertices[3] = center_y - size;
-      vertices[4] = center_x;
-      vertices[5] = center_y + size;*/
       gl.bufferData( gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW );
 
       var R = Math.random();
