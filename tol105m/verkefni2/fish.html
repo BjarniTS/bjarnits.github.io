@@ -1,0 +1,74 @@
+<html>
+
+<div>
+    dx -1.0
+    <input id="slider_cohesion" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
+    1.0: <span id="span_cohesion">0.0</span>
+</div>
+<div>
+    dy -1.0
+    <input id="slider_separation" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
+    1.0: <span id="span_separation">0.0</span>
+</div>
+<div>
+    dz -1.0
+    <input id="slider_alignment" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
+    1.0: <span id="span_alignment">0.0</span>
+</div>
+<div>
+    dz 0.0
+    <input id="slider_speed" type="range" min="0.0" max="0.05" step="0.0002" value="0.001" />
+    0.01: <span id="span_speed">0.001</span>
+</div>
+<div>
+    yaw: <span id="myspan1">a</span>
+    pitch: <span id="myspan2">b</span>
+    misc: <span id="myspan3">c</span>
+</div>
+<!-- <div>
+    dx -1.0
+    <input id="dx" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
+    1.0
+</div> -->
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+
+attribute  vec4 vPosition;
+
+uniform mat4 projection;
+uniform mat4 modelview;
+
+void main() 
+{
+    gl_PointSize = 4.0;
+    gl_Position = projection * modelview * vPosition;
+} 
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+
+precision mediump float;
+   
+uniform vec4 fColor;
+
+void
+main()
+{
+    gl_FragColor = fColor;
+}
+</script>
+
+<script type="text/javascript" src="../Common/webgl-utils.js"></script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MV.js"></script>
+<script type="text/javascript" src="fish.js"></script>
+
+<body>
+<canvas id="gl-canvas" width="500"" height="500">
+Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+   
+<br/>
+
+</body>
+</html>
