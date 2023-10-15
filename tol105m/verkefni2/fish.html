@@ -1,35 +1,25 @@
 <html>
 
 <div>
-    dx -1.0
-    <input id="slider_cohesion" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
-    1.0: <span id="span_cohesion">0.0</span>
+    Cohesion radius 0.1
+    <input id="slider_cohesion" type="range" min="0.1" max="5.0" step="0.05" value="2.0" />
+    5.0: <span id="span_cohesion">2.0</span>
 </div>
 <div>
-    dy -1.0
-    <input id="slider_separation" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
-    1.0: <span id="span_separation">0.0</span>
+    Separation radius (% of cohesion radius) 5.0
+    <input id="slider_separation" type="range" min="5.0" max="95.0" step="5.0" value="30.0" />
+    95.0: <span id="span_separation">30.0</span>
 </div>
 <div>
-    dz -1.0
-    <input id="slider_alignment" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
-    1.0: <span id="span_alignment">0.0</span>
+    Alignment strength 0.1
+    <input id="slider_alignment" type="range" min="0.1" max="0.9" step="0.05" value="0.4" />
+    0.9: <span id="span_alignment">0.4</span>
 </div>
 <div>
-    dz 0.0
-    <input id="slider_speed" type="range" min="0.0" max="0.05" step="0.0002" value="0.001" />
-    0.01: <span id="span_speed">0.001</span>
+    Fish speed 0.0
+    <input id="slider_speed" type="range" min="0.0" max="0.05" step="0.0002" value="0.014" />
+    0.05: <span id="span_speed">0.014</span>
 </div>
-<div>
-    yaw: <span id="myspan1">a</span>
-    pitch: <span id="myspan2">b</span>
-    misc: <span id="myspan3">c</span>
-</div>
-<!-- <div>
-    dx -1.0
-    <input id="dx" type="range" min="-1.0" max="1.0" step="0.05" value="0.0" />
-    1.0
-</div> -->
 
 <script id="vertex-shader" type="x-shader/x-vertex">
 
@@ -64,7 +54,7 @@ main()
 <script type="text/javascript" src="fish.js"></script>
 
 <body>
-<canvas id="gl-canvas" width="500"" height="500">
+<canvas id="gl-canvas" width="800"" height="800">
 Oops ... your browser doesn't support the HTML5 canvas element
 </canvas>
    

@@ -11,21 +11,6 @@ var NumTail = 3;
 
 var vPosition;
 
-// Hnútar fisks í xy-planinu
-// var vertices = [
-//     // líkami (spjald)
-//     vec4( -0.5,  0.0, 0.0, 1.0 ),
-// 	vec4(  0.2,  0.2, 0.0, 1.0 ),
-// 	vec4(  0.5,  0.0, 0.0, 1.0 ),
-// 	vec4(  0.5,  0.0, 0.0, 1.0 ),
-// 	vec4(  0.2, -0.15, 0.0, 1.0 ),
-// 	vec4( -0.5,  0.0, 0.0, 1.0 ),
-// 	// sporður (þríhyrningur)
-//     vec4( -0.5,  0.0, 0.0, 1.0 ),
-//     vec4( -0.65,  0.15, 0.0, 1.0 ),
-//     vec4( -0.65, -0.15, 0.0, 1.0 )
-// ];
-
 var fish_buffer;
 
 var fish_locs = [
@@ -141,8 +126,6 @@ var tank_verts = [
 
 var center_vert = vec4(0.0, 0.0, 0.0, 1.0);
 
-
-
 var movement = false;     // Er músarhnappur niðri?
 var spinX = 0;
 var spinY = 0;
@@ -157,11 +140,12 @@ for(let i = 0; i < fish_locs.length; ++i) {
     fish_rng.push(Math.random());
 }
 
-var zView = 2.5;          // Staðsetning áhorfanda í z-hniti
+var zView = 12.0;          // Staðsetning áhorfanda í z-hniti
 
-var fish_speed = 0.0002;
+var fish_speed = 0.014;
 var influence_radius = 2.0;
-var sep_radius = influence_radius / 3.0;
+var sep_radius = 0.30;
+var alignment_strength = 0.4;
 
 var proLoc;
 var mvLoc;
@@ -205,8 +189,6 @@ window.onload = function init()
 
     vPosition = gl.getAttribLocation( program, "vPosition" );
     gl.enableVertexAttribArray( vPosition );
-
-
 
     colorLoc = gl.getUniformLocation( program, "fColor" );
 
@@ -262,20 +244,17 @@ window.onload = function init()
 
     document.getElementById("slider_cohesion").onchange = function(event) {
         let value = parseFloat(event.target.value);
-        fish_dirs[0][0] = value;
-        fish_dirs[0] = normalize(fish_dirs[0]);
+        influence_radius = value;
         document.getElementById("span_cohesion").textContent = value;
     };
     document.getElementById("slider_separation").onchange = function(event) {
         let value = parseFloat(event.target.value);
-        fish_dirs[0][1] = value;
-        fish_dirs[0] = normalize(fish_dirs[0]);
-        document.getElementById("span_serparation").textContent = value;
+        sep_radius = value / 100.0;
+        document.getElementById("span_separation").textContent = value;
     };
     document.getElementById("slider_alignment").onchange = function(event) {
         let value = parseFloat(event.target.value);
-        fish_dirs[0][2] = value;
-        fish_dirs[0] = normalize(fish_dirs[0]);
+        alignment_strength = value;
         document.getElementById("span_alignment").textContent = value;
     };
     document.getElementById("slider_speed").onchange = function(event) {
@@ -284,16 +263,16 @@ window.onload = function init()
         document.getElementById("span_speed").textContent = value;
     };
 
-    let all_dists = [];
+    // let all_dists = [];
 
-    for(let i = 0; i < fish_locs.length; ++i) {
-        let dists = [];
-        for(let j = 0; j < fish_locs.length; ++j) {
-            dists.push(length(subtract(fish_locs[i], fish_locs[j])));
-        }
-        all_dists.push(dists);
-    }
-    console.log(all_dists);
+    // for(let i = 0; i < fish_locs.length; ++i) {
+    //     let dists = [];
+    //     for(let j = 0; j < fish_locs.length; ++j) {
+    //         dists.push(length(subtract(fish_locs[i], fish_locs[j])));
+    //     }
+    //     all_dists.push(dists);
+    // }
+    // console.log(all_dists);
     
 
     render();
@@ -304,7 +283,7 @@ function render()
 {
     gl.clear( gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    var view = lookAt( vec3(0.3, 0.3, zView), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0) );
+    var view = lookAt( vec3(4.0, 4.0, zView), vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0) );
     view = mult( view, rotateX(spinX) );
     view = mult( view, rotateY(spinY) );
 
@@ -328,14 +307,19 @@ function render()
     gl.drawArrays(gl.TRIANGLE_FAN, 16, 4);
     gl.drawArrays(gl.TRIANGLE_FAN, 20, 4);
 
-    //let fish_dir_avg = normalize(avg_v3_arr(fish_dirs));
+    gl.uniform4fv( colorLoc, vec4(0.0, 0.0, 0.0, 1.0));
+    gl.drawArrays(gl.LINE_LOOP, 0, 4);
+    gl.drawArrays(gl.LINE_LOOP, 4, 4);
+    gl.drawArrays(gl.LINE_LOOP, 8, 4);
+    gl.drawArrays(gl.LINE_LOOP, 12, 4);
+    gl.drawArrays(gl.LINE_LOOP, 16, 4);
+    gl.drawArrays(gl.LINE_LOOP, 20, 4);
+
     let fish_pos_avg = avg_v3_arr(fish_locs);
     fish_dirs = adjust_dirs(fish_dirs, fish_locs);
 
     // Teikna fiska
     for(var f = 0; f < fish_locs.length; ++f) {
-        
-        //fish_dirs[f] = [...fish_dir_avg];
 
         fish_locs[f] = add(fish_locs[f], scale(fish_speed, fish_dirs[f]));
 
@@ -355,20 +339,19 @@ function render()
         mv = mult(mv, rotateY(-yaw)); // Yaw
         mv = mult(mv, rotateZ(pitch)); // Pitch
 
-        let myspan1 = document.getElementById("myspan1");
-        let myspan2 = document.getElementById("myspan2");
-        let myspan3 = document.getElementById("myspan3");
-        myspan1.textContent = yaw;
-        myspan2.textContent = pitch;
-        myspan3.textContent = dir;
+        // let myspan1 = document.getElementById("myspan1");
+        // let myspan2 = document.getElementById("myspan2");
+        // let myspan3 = document.getElementById("myspan3");
+        // myspan1.textContent = yaw;
+        // myspan2.textContent = pitch;
+        // myspan3.textContent = dir;
 
         // Miðpunktur
-        gl.bindBuffer(gl.ARRAY_BUFFER, center_buffer);
-        gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
-        gl.uniform4fv(colorLoc, vec4(0.0, 0.0, 0.0, 1.0));
-        //let ap = avg_v3_arr(fish_locs);
-        gl.uniformMatrix4fv(mvLoc, false, flatten(mult(view, translate(fish_pos_avg))));
-        gl.drawArrays(gl.POINTS, 0, 1);
+        // gl.bindBuffer(gl.ARRAY_BUFFER, center_buffer);
+        // gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 0, 0);
+        // gl.uniform4fv(colorLoc, vec4(0.0, 0.0, 0.0, 1.0));
+        // gl.uniformMatrix4fv(mvLoc, false, flatten(mult(view, translate(fish_pos_avg))));
+        // gl.drawArrays(gl.POINTS, 0, 1);
 
         // Fiskar
         gl.enable(gl.DEPTH_TEST);
@@ -384,8 +367,8 @@ function render()
         gl.uniformMatrix4fv(mvLoc, false, flatten(mv));
         gl.drawArrays( gl.TRIANGLES, 3, 3 );
 
-        // Uggar
-        let fish_rot_fin = rotTail + fish_rng[f]*2.0;
+        // Uggar (með snúningi)
+        let fish_rot_fin = rotTail + fish_rng[f]*5.0;
         // - Hægri
         let uh = mult(mv, rotateX(fish_rot_fin));
         gl.uniformMatrix4fv(mvLoc, false, flatten(uh));
@@ -412,8 +395,6 @@ function render()
 }
 
 function adjust_dirs(dirs, locs) {
-    //let dir_avg = normalize(avg_v3_arr(dirs));
-    //let loc_avg = avg_v3_arr(locs);
 
     let all_dists = [];
     for(let i = 0; i < locs.length; ++i) {
@@ -449,36 +430,34 @@ function adjust_dirs(dirs, locs) {
             if(i != j && all_dists[i][j] < influence_radius) {
                 ++num;
                 sum = add(sum, locs[j]);
-                console.log('i in neighbor_avg_locs', i);
+                //console.log('i in neighbor_avg_locs', i);
             }
         }
         if(num != 0) neighbor_avg_locs.push(scale(1 / num, sum));
         else neighbor_avg_locs.push(locs[i]);
     }
-    console.log('neighbor_avg_locs', neighbor_avg_locs);
-    console.log('0 loc', locs[0]);
-    console.log('1 loc', locs[1]);
+    // console.log('neighbor_avg_locs', neighbor_avg_locs);
+    // console.log('0 loc', locs[0]);
+    // console.log('1 loc', locs[1]);
 
     let coh_sep_dirs = [];
     for(let i = 0; i < neighbor_avg_locs.length; ++i) {
         if(locs[i] == neighbor_avg_locs[i]) {
             coh_sep_dirs.push(dirs[i]);
-            //continue;
         }
-        else if(length(subtract(locs[i], neighbor_avg_locs[i])) < sep_radius) {
-            console.log('too close', i, length(subtract(locs[i], neighbor_avg_locs[i])));
+        else if(length(subtract(locs[i], neighbor_avg_locs[i])) < sep_radius * influence_radius) {
+            //console.log('too close', i, length(subtract(locs[i], neighbor_avg_locs[i])));
             let dir_to_avg = normalize(subtract(neighbor_avg_locs[i], locs[i]));
             coh_sep_dirs.push(scale(-1.0, dir_to_avg));
         }
         else {
             coh_sep_dirs.push(normalize(subtract(neighbor_avg_locs[i], locs[i])));
-            console.log('last else', i, length(subtract(locs[i], neighbor_avg_locs[i])));
+            //console.log('last else', i, length(subtract(locs[i], neighbor_avg_locs[i])));
         }
     }
 
     for(let i = 0; i < dirs.length; ++i) {
-        //console.log('coh_sep_dirs length:', coh_sep_dirs.length)
-        let combined_dir = normalize(mix(coh_sep_dirs[i], alignments[i], 0.4));
+        let combined_dir = normalize(mix(coh_sep_dirs[i], alignments[i], alignment_strength));
         dirs[i] = normalize(mix(combined_dir, dirs[i], 0.9));
     }
 
