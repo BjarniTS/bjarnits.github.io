@@ -321,7 +321,7 @@ function render()
     // Teikna fiska
     for(var f = 0; f < fish_locs.length; ++f) {
 
-        fish_locs[f] = add(fish_locs[f], scale(fish_speed, fish_dirs[f]));
+        fish_locs[f] = add(fish_locs[f], scaler(fish_speed, fish_dirs[f]));
 
         // Collision with tank
         if(fish_locs[f][0] > tank_width) fish_locs[f][0]=-tank_width;
@@ -417,7 +417,7 @@ function adjust_dirs(dirs, locs) {
                 sum = add(sum, dirs[j]);
             }
         }
-        if(num != 0) alignments.push(normalize(scale(1 / num, sum)));
+        if(num != 0) alignments.push(normalize(scaler(1 / num, sum)));
         else alignments.push(dirs[i]);
     }
 
@@ -433,7 +433,7 @@ function adjust_dirs(dirs, locs) {
                 //console.log('i in neighbor_avg_locs', i);
             }
         }
-        if(num != 0) neighbor_avg_locs.push(scale(1 / num, sum));
+        if(num != 0) neighbor_avg_locs.push(scaler(1 / num, sum));
         else neighbor_avg_locs.push(locs[i]);
     }
     // console.log('neighbor_avg_locs', neighbor_avg_locs);
@@ -448,7 +448,7 @@ function adjust_dirs(dirs, locs) {
         else if(length(subtract(locs[i], neighbor_avg_locs[i])) < sep_radius * influence_radius) {
             //console.log('too close', i, length(subtract(locs[i], neighbor_avg_locs[i])));
             let dir_to_avg = normalize(subtract(neighbor_avg_locs[i], locs[i]));
-            coh_sep_dirs.push(scale(-1.0, dir_to_avg));
+            coh_sep_dirs.push(scaler(-1.0, dir_to_avg));
         }
         else {
             coh_sep_dirs.push(normalize(subtract(neighbor_avg_locs[i], locs[i])));

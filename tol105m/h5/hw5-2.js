@@ -101,7 +101,7 @@ var spinY = 0;
 var origX;
 
 var pos_x = 0.0;
-var pos_z = 3.0;
+var pos_z = 10.0;
 var dir_x = 0.0;
 var dir_z = 1.0;
 var mov_d = 0.05;
@@ -183,20 +183,26 @@ window.onload = function init() {
     // Event listener for keyboard
      window.addEventListener("keydown", function(e){
          switch( e.keyCode ) {
-            case 65:	// a - snýr neðri armi
-			    pos_x -= mov_d * dir_x;
-                break;
+            case 65:	// a - færir til vinstri
+            pos_x -= mov_d * dir_z;
+            pos_z -= mov_d * dir_x;
+            break;
             case 68:    // d - færir til hægri
-                pos_x += mov_d * dir_x;
-                break;
-            case 83:	// s - snýr neðri armi
-			    pos_z += mov_d * dir_z;
-                break;
-            case 87:	// w - snýr efri armi
-			    pos_z -= mov_d * dir_z;
-                break;
-         }
-     }  );
+            pos_x += mov_d * dir_z;
+            pos_z += mov_d * dir_x;
+            break;
+            case 83:	// s - færir aftur
+            pos_z += mov_d * dir_z;
+            pos_x -= mov_d * dir_x;
+            break;
+            case 87:	// w - færir áfram
+            pos_z -= mov_d * dir_z;
+            pos_x += mov_d * dir_x;
+            break;
+        }
+        console.log('pos_x', pos_x, 'pos_z', pos_z);
+        console.log('dir_x', dir_x, 'dir_z', dir_z);
+    }  );
      
      window.addEventListener("keyup", function(e) {
         key = 0;
