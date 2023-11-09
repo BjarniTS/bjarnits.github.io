@@ -1,0 +1,15 @@
+const player_start_pos = [0.0, 0.0];
+const shroom_radius = 0.5;
+const grid_size = [12, 16];
+const player_area_extents = [0.0 + 0.5, grid_size[0] - 0.5, Math.floor(-grid_size[1] / 2) + 0.5, 0.0 - 0.5];
+const fps = 60;
+const bullet_reload_time = 100;
+const bullet_speed = 6.0 / fps;
+const player_speed = 10.0 / fps;
+const centipede_speed = 1.0 / fps;
+const frame_length = 1000 / fps;
+const grid = multi_array(grid_size[0], grid_size[1]);
+const bullets = new Set();
+const centipedes = [];
+const canvas = document.querySelector('#c');
+canvas.width = canvas.height * 1.0 * grid_size[0] / grid_size[1];
