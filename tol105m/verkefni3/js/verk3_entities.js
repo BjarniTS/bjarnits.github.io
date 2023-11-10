@@ -5,16 +5,11 @@ function Entity(type, dir = null) {
   this.dir = dir;
 }
 
-function CentipedeData(dir, next_segment = null, prev_dir = null) {
-  this.dir = dir;
-  this.next_segment= next_segment;
-  this.prev_dir = prev_dir;
-}
-
 function set_turn(col, row, dir) {
   const turn_entity = new Entity('t', dir);
   const turn = new THREE.Group();
   turn.userData = turn_entity;
+  grid[row][col] = turn;
 }
 
 // Búa til gólfið með mynstrinu sem áferð
@@ -98,12 +93,21 @@ function clone_centipede_seg(dir) {
   return centiseg_clone;
 }
 
+function CentipedeData(dir, vert_dir = 1, head = null, next_segment = null, prev_segment = null, turn_points = []) {
+  this.dir = dir;
+  this.turn_points = turn_points;
+  this.vert_dir = vert_dir;
+  this.next_segment= next_segment;
+  this.prev_segment = prev_segment;
+  this.head = head;
+}
+
 function spawn_centipede(col, row, length, dir, scene) {
   if(grid[row][col] !== null) return;
   const head = clone_centipede_head(dir);
   const head_pos = cr_to_xz(col, row);
   head.position.set(head_pos[0], 0.0, head_pos[1]); 
-  head.userData = new CentipedeData(dir);
+  head.userData = new CentipedeData(dir, 1, head);
   centipedes.push(head);
   scene.add(head);
 
@@ -113,9 +117,10 @@ function spawn_centipede(col, row, length, dir, scene) {
     const seg_pos = cr_to_xz(col + (i + 1) * -dir[0], row + (i + 1) * dir[1]);
     console.log('spawn_centipede seg_pos: ', seg_pos, ' col: ', col, ' row: ', row, ' dir: ', dir);
     seg.position.set(seg_pos[0], 0.0, seg_pos[1]);
-    seg.userData = new CentipedeData(dir);
+    seg.userData = new CentipedeData(dir, 1, head);
     scene.add(seg);
     curr_seg.userData.next_segment = seg;
+    seg.userData.prev_segment = curr_seg;
     curr_seg = seg;
   }
 
@@ -146,7 +151,7 @@ function spawn_shroom(col, row, scene) {
 
 
 function make_bullet() {
-  // Make bullet group for cloning
+  // Make bullet for cloning
   const bulletGeo = new THREE.ConeGeometry(0.1, 0.15, 6);
   const bulletMat = new THREE.MeshPhongMaterial();
   bulletMat.color.setRGB(1.0, 1.0, 0.0);
@@ -160,7 +165,7 @@ function make_bullet() {
 
 const bullet = make_bullet();
 
-function spawn_bullet(x, z) {
+function spawn_bullet(x, z, scene) {
   const bullet_clone = bullet.clone();
   bullet_clone.userData = new Entity('m');
   bullet_clone.position.set(x, -0.25, z);
