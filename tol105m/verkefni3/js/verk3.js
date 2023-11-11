@@ -3,25 +3,17 @@ import {
   spawn_bullet,
   spawn_shroom,
   spawn_centipede,
+  spawn_centipede_head,
   make_player,
   make_floor,
-  set_turn
+  set_turn,
+  set_walls
 } from "entities";
 // NOTE: have the centipede shoot a shot when it turns down?
 
+//set_walls();
 console.log(grid);
 
-console.log(is_crossing_center([1.0, 2.0], [1.5, 2.0], [1.6, 2.0]));
-console.log(is_crossing_center([1.0, 2.0], [1.0, 2.0], [1.6, 2.0]));
-console.log(is_crossing_center([1.0, 2.0], [1.5, 2.0], [1.5, 2.0]));
-
-console.log(is_crossing_center([1.0, 2.0], [1.5, 2.0], [0.9, 2.0]));
-console.log(is_crossing_center([1.0, 2.0], [1.0, 2.0], [1.0, 2.0]));
-console.log(is_crossing_center([1.0, 2.0], [1.5, 2.0], [1.4, 2.0]));
-
-console.log(is_crossing_center([1.0, 2.0], [1.0, 2.5], [1.0, 2.6]));
-console.log(is_crossing_center([1.0, 2.0], [1.0, 2.0], [1.0, 2.6]));
-console.log(is_crossing_center([1.0, 2.0], [1.0, 2.5], [1.0, 2.5]));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('skyblue');
@@ -154,28 +146,50 @@ const animate = function (timestamp) {
             bullets.delete(bullet);
             scene.remove(bullet);
 
-            // If we hit a non-end segment then set the previous segment's reference to
-            // it to null
+            // If we hit a non-head segment then set the previous segment's reference to it to null
             if(seg.userData.prev_segment !== null) {
               console.log(seg.userData.prev_segment);
               const prev_seg = seg.userData.prev_segment;
               prev_seg.userData.next_segment = null;
+            } else {
+              // If we hit a head segment then remove it from list of centipedes
+              centipedes.delete(seg);
             }
 
-            // Remove the following segments
-            let num_segs = 0;
-            let tail_seg = seg;
-
             scene.remove(seg);
-
 
             // Spawn a mushroom in place of the segment
             const seg_cell = xz_to_cr(seg.position.x, seg.position.z);
             spawn_shroom(seg_cell[0], seg_cell[1], scene);
 
-            // Spawn a new centipede next to the mushroom
+            // If we hit a non-end segment then replace next segment with head
+            if(seg.userData.next_segment !== null) {
+              const next_seg = seg.userData.next_segment;
+              const next_seg_cell = xz_to_cr(next_seg.position.x, next_seg.position.z);
+              const new_head = spawn_centipede_head(next_seg_cell[0], next_seg_cell[1], next_seg.userData.dir);
+              new_head.userData = next_seg.userData;
+              new_head.userData.head = new_head;
+              
+              const next_next_seg = next_seg.userData.next_segment;
+              next_next_seg.userData.prev_segment = new_head;
+              scene.remove(next_seg);
+              scene.add(new_head);
+              centipedes.add(new_head);
+              next_seg.userData.prev_segment = null;
 
-            // Place a turn token next to the mushroom
+              // Move all the segments from the new centipede to center of their cells
+              let seg_to_adjust = new_head.userData.next_segment;
+              while(seg_to_adjust !== null) {
+                const cell = xz_to_cr(seg_to_adjust.position.x, seg_to_adjust.position.z);
+                const center = cr_to_xz(cell[0], cell[1]);
+                seg_to_adjust.position.x = center[0];
+                seg_to_adjust.position.z = center[1];
+
+                seg_to_adjust = seg_to_adjust.userData.next_segment;
+              }
+
+
+            }
 
             console.log("bullet strike!");
           }
@@ -246,18 +260,29 @@ function move_centipede(centipede) {
     
     // If we're the head and are crossing into a new cell...
     if(seg.userData.head == seg && is_crossing_cells(old_cell, new_cell)) {
+      const next_cell = [new_cell[0] + seg.userData.dir[0], new_cell[1] + seg.userData.dir[1]];
+      const vert_cell = [new_cell[0], new_cell[1] - seg.userData.vert_dir];
+      
+      // Get some states
+      //const heading_into_mushroom = grid[next_cell[1]][next_cell[0]] !== null && grid[next_cell[1]][next_cell[0]].userData.type === 'm';
+      const heading_laterally = seg.userData.dir[1] == 0;
+      const heading_into_obstacle = is_out_of_bounds(next_cell)                || 
+                                    (grid[next_cell[1]][next_cell[0]] !== null && 
+                                     grid[next_cell[1]][next_cell[0]].userData.type === 'm');
 
+      const vert_obstacle =         is_out_of_bounds(vert_cell)                ||
+                                    (grid[vert_cell[1]][vert_cell[0]] !== null && 
+                                     grid[vert_cell[1]][vert_cell[0]].userData.type === 'm');
+      
+      console.log('new cell: ', new_cell, ' next_cell: ', next_cell, ' vert_cell: ', vert_cell, ' heading_into_obstacle: ', heading_into_obstacle, ' vert_obstacle: ', vert_obstacle);
       // If next cell is a mushroom and we're moving laterally then
       // turn and put down turn tokens
-      const next_cell = [new_cell[0] + seg.userData.dir[0], new_cell[1] + seg.userData.dir[1]];
-      if( is_out_of_bounds(next_cell) ||
-          (grid[next_cell[1]][next_cell[0]] !== null && grid[next_cell[1]][next_cell[0]].userData.type === 'm' &&
-          seg.userData.dir[1] == 0))
-      {
-        console.log('next is mushroom');
-        // Put down turn token on current cell and cell below
-        set_turn(new_cell[0], new_cell[1], [0,1]);
-        set_turn(new_cell[0], new_cell[1] - 1, [-seg.userData.dir[0], seg.userData.dir[1]]);
+      if( heading_into_obstacle && heading_laterally) {
+        console.log('next is obstacle');
+        if(vert_obstacle) seg.userData.vert_dir *= -1;
+        
+        set_turn(new_cell[0], new_cell[1], [0, seg.userData.vert_dir]);
+        set_turn(new_cell[0], new_cell[1] - seg.userData.vert_dir, [-seg.userData.dir[0], seg.userData.dir[1]]);
   
       }      
     }
@@ -311,92 +336,3 @@ function is_out_of_bounds(cell) {
           cell[1] < 0;
 }
 
-
-// // Klasi til að breyta texta í felliglugga í valmynd í tölu
-// class StringToNumberHelper {
-//   constructor(obj, prop) {
-//     this.obj = obj;
-//     this.prop = prop;
-//   }
-//   get value() {
-//     return this.obj[this.prop];
-//   }
-//   set value(v) {
-//     this.obj[this.prop] = parseFloat(v);
-//   }
-// }
-
-// // Möguleikar í valmynd
-// const magFilterModes = {
-//   'Nearest': THREE.NearestFilter,
-//   'Linear': THREE.LinearFilter
-// };
-// const minFilterModes = {
-//   'Nearest': THREE.NearestFilter,
-//   'Linear': THREE.LinearFilter,
-//   'NearestMipmapNearest': THREE.NearestMipmapNearestFilter,
-//   'NearestMipmapLinear': THREE.NearestMipmapLinearFilter,
-//   'LinearMipmapNearest': THREE.LinearMipmapNearestFilter,
-//   'LinearMipmapLinear': THREE.LinearMipmapLinearFilter
-// };
-
-// function updateTexture() {
-//   floorTexture.needsUpdate = true;
-// }
-
-// function updateCamera() {
-//   camera.updateProjectionMatrix();
-// }
-
-
-
-// Búa til valmynd með möguleikum fyrir stækkunar- og minnkunarsíun
-// const gui = new dat.GUI();
-// gui.add(new StringToNumberHelper(floorTexture, 'magFilter'), 'value', magFilterModes)
-//         .name('floorTexture.magFilter')
-//         .onChange(updateTexture);
-// gui.add(new StringToNumberHelper(floorTexture, 'minFilter'), 'value', minFilterModes)
-//         .name('floorTexture.minFilter')
-//         .onChange(updateTexture);
-// gui.add(floorTexture, 'anisotropy', 1, maxAniso)
-//         .onChange(updateTexture);
-// //gui.add(camera, 'fov', 1, 180).onChange(updateCamera);
-// gui.add(camera.position, 'x', 0, 10).onChange();
-// gui.add(light.position, 'y', 0, 10).onChange();
-
-
-
-
-
-    
-
-
-  
-      // //console.log('move_centipede: next_seg_cell: ', next_seg_cell);
-      // const shroom_pos = cr_to_xz(next_cell[0], next_cell[1]);
-      // const d_new_to_shroom = dist(shroom_pos[0], shroom_pos[1], new_pos_x, new_pos_z);
-      
-      // // If we will collide with the shroom, let's move adjacent and then the rest of the move down
-      // if(d_new_to_shroom < 1.0) { 
-      //   // Distance from previous position to shroom
-      //   const d_old_to_shroom = dist(seg.position.x, seg.position.z, shroom_pos[0], shroom_pos[1]);
-      //   // Distance that we still have to move (should not be negative!)
-      //   const d_leftover = centipede_speed - (d_old_to_shroom - 1.0);
-      //   // Distance to center of current cell (should not be negative!)
-      //   const new_seg_cell_center = cr_to_xz(new_cell[0], new_cell[1]);
-      //   // Move segment to center of current cell
-      //   seg.position.x = new_seg_cell_center[0];
-      //   seg.position.z = new_seg_cell_center[1];
-      //   // Turn segment down
-      //   seg.userData.prev_dir = seg.userData.dir;
-      //   seg.userData.dir = [0, 1];
-      //   seg.rotation.y = Math.atan2(-seg.userData.dir[1], seg.userData.dir[0]);
-      //   // Move in new direction by leftover distance
-      //   new_pos_x = seg.position.x + seg.userData.dir[0] * d_leftover;
-      //   new_pos_z = seg.position.z + seg.userData.dir[1] * d_leftover;
-      //   const d_old_pos_to_center = dist(seg.position.x, seg.position.z, new_seg_cell_center[0], new_seg_cell_center[1]);
-      //   const d_to_old_cell_center = dist(seg.position.x, seg.position.z, )
-      //   //console.log('move_centipede: d_leftover: ', d_leftover, ' d_old_pos_to_center: ', d_old_pos_to_center, ' d_old_to_shroom: ', d_old_to_shroom, 'centipede_speed: ', centipede_speed);
-
-      // }
-    //}

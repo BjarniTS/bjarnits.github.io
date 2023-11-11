@@ -5,6 +5,21 @@ function Entity(type, dir = null) {
   this.dir = dir;
 }
 
+function set_walls() {
+  for(let i = 0; i < grid_size[0] + 2; ++i) {
+    grid[0][i] = new Entity('w');
+  }
+  for(let i = 0; i < grid_size[0] + 2; ++i) {
+    grid[grid_size[1] + 1][i] = new Entity('w');
+  }
+  for(let i = 1; i < grid_size[1] + 2; ++i) {
+    grid[i][0] = new Entity('w');
+  }
+  for(let i = 1; i < grid_size[1] + 2; ++i) {
+    grid[i][grid_size[0] + 1] = new Entity('w');
+  }
+}
+
 function set_turn(col, row, dir) {
   const turn_entity = new Entity('t', dir);
   const turn = new THREE.Group();
@@ -102,13 +117,23 @@ function CentipedeData(dir, vert_dir = 1, head = null, next_segment = null, prev
   this.head = head;
 }
 
+function spawn_centipede_head(col, row, dir, scene) {
+  const head = clone_centipede_head(dir);
+  const head_pos = cr_to_xz(col, row);
+  head.position.set(head_pos[0], 0.0, head_pos[1]); 
+  head.userData = new CentipedeData(dir, 1, head);
+  centipedes.add(head);
+
+  return head;
+}
+
 function spawn_centipede(col, row, length, dir, scene) {
   if(grid[row][col] !== null) return;
   const head = clone_centipede_head(dir);
   const head_pos = cr_to_xz(col, row);
   head.position.set(head_pos[0], 0.0, head_pos[1]); 
   head.userData = new CentipedeData(dir, 1, head);
-  centipedes.push(head);
+  centipedes.add(head);
   scene.add(head);
 
   let curr_seg = head;
@@ -177,7 +202,9 @@ export {
   spawn_bullet,
   spawn_shroom,
   spawn_centipede,
+  spawn_centipede_head,
   make_player,
   make_floor,
-  set_turn
+  set_turn,
+  set_walls
 }
