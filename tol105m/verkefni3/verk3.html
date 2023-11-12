@@ -2,10 +2,22 @@
 <html>
 	<head>
 		<meta charset="utf-8">
-		<title>Sýnidæmi um mynstursíun</title> 
+		<title>Sýnidæmi um mynstursíun</title>
+    <link rel="stylesheet" href="styles.css"/>
 	</head>
 	<body>
-    <canvas id="c"  width="800" height="800"></canvas>
+    <div class="container">
+      <canvas id="c"  width="800" height="800"></canvas>
+      <div>
+        <div>Hreyfa með a, s, d, w</div>
+        <div>Skjóta með spacebar</div>
+        <div>Skipta um sjónarhorn með b</div>
+        <div>
+          <span>Score: </span>
+          <span id="score">0</span>
+        </div>
+      </div>
+    </div>
 		<!-- <script src="js/three.min.js"></script> -->
     <!-- <script src="js/OrbitControls.js"></script> -->
 		<script src="js/dat.gui.min.js"></script>

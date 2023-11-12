@@ -62,17 +62,23 @@ function make_centipede_head() {
   const centiheadMat = new THREE.MeshPhongMaterial();
   const eyeMat = new THREE.MeshPhongMaterial();
   centiheadMat.color.setRGB(0.0, 0.5, 0.0);
-  eyeMat.color.setRGB(0.5, 0.5, 0.5);
+  eyeMat.color.setRGB(1.0, 0.2, 0.2);
   
   const centiheadMesh = new THREE.Mesh(centiheadGeo, centiheadMat);
   centiheadMesh.rotation.z = -0.5 * Math.PI;
-  const eyeMesh = new THREE.Mesh(eyeGeo, eyeMat);
-  eyeMesh.position.x = 0.4;
-  eyeMesh.position.y = 1.0;
+  const eyeMesh1 = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeMesh1.position.x = 0.25;
+  eyeMesh1.position.z = 0.25;
+  eyeMesh1.position.y = 0.32;
+  const eyeMesh2 = new THREE.Mesh(eyeGeo, eyeMat);
+  eyeMesh2.position.x = 0.25;
+  eyeMesh2.position.z = -0.25;
+  eyeMesh2.position.y = 0.32;
   
   const centihead = new THREE.Group();
   centihead.add(centiheadMesh);
-  centihead.add(eyeMesh);
+  centihead.add(eyeMesh1);
+  centihead.add(eyeMesh2);
 
   return centihead;
 }
@@ -152,22 +158,80 @@ function spawn_centipede(col, row, length, dir, scene) {
   return head;
 }
 
-function make_shroom() {
-  const sphereGeo = new THREE.SphereGeometry(shroom_radius, 32, 16);
-  const sphereMat = new THREE.MeshPhongMaterial();
-  sphereMat.color.setRGB(1.0, 0.0, 0.0);
-  const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+
+const shroomGeo = new THREE.SphereGeometry(shroom_radius, 32, 16);
+const shroom1Geo = new THREE.SphereGeometry(shroom_radius, 16, 8);
+const shroom2Geo = new THREE.SphereGeometry(shroom_radius, 8, 4);
+const shroom3Geo = new THREE.SphereGeometry(shroom_radius, 4, 2);
+const shroomStalkGeo = new THREE.CapsuleGeometry(0.2, 0.3, 8, 8);
+const shroomMat = new THREE.MeshPhongMaterial();
+const shroom1Mat = new THREE.MeshPhongMaterial();
+const shroom2Mat = new THREE.MeshPhongMaterial();
+const shroom3Mat = new THREE.MeshPhongMaterial();
+shroomMat.color.setRGB(1.0, 0.0, 0.0);
+shroom1Mat.color.setRGB(0.8, 0.0, 0.0);
+shroom2Mat.color.setRGB(0.5, 0.0, 0.0);
+shroom3Mat.color.setRGB(0.3, 0.0, 0.0);
+
+function make_shroom(level) {
+  let geo;
+  let mat;
+  switch (level) {
+    case 0:
+      geo = shroomGeo;
+      mat = shroomMat;
+      break;
+    case 1:
+      geo = shroom1Geo;
+      mat = shroom1Mat;
+      break;
+    case 2:
+      geo = shroom2Geo;
+      mat = shroom2Mat;
+      break;
+    case 3:
+      geo = shroom3Geo;
+      mat = shroom3Mat;
+      break;
+  }
+
+  const shroomMesh = new THREE.Mesh(geo, mat);
+  const shroomStalkMesh = new THREE.Mesh(shroomStalkGeo, mat);
+  shroomMesh.scale.y = 0.5;
+  shroomStalkMesh.position.y = -0.15;
   const shroom = new THREE.Group();
-  shroom.add(sphereMesh);
-  shroom.userData = new Entity('m');  
+  shroom.add(shroomMesh);
+  shroom.add(shroomStalkMesh);
+  shroom.userData = new Entity('m', [level, 0]);  
 
   return shroom;
 }
 
-const shroom = make_shroom();
 
-function spawn_shroom(col, row, scene) {
-  const shroom_clone = shroom.clone();
+const shroom = make_shroom(0);
+const shroom1 = make_shroom(1);
+const shroom2 = make_shroom(2);
+const shroom3 = make_shroom(3);
+
+
+function spawn_shroom(col, row, level, scene) {
+  let shroom_clone;
+  switch (level) {
+    case 0:
+      shroom_clone = shroom.clone();
+      break;
+    case 1:
+      shroom_clone = shroom1.clone();
+      break;
+    case 2:
+      shroom_clone = shroom2.clone();
+      break;
+    case 3:
+      shroom_clone = shroom3.clone();
+      break;
+    case 4:
+      return;
+  }
   const shroom_pos = cr_to_xz(col, row);
   shroom_clone.position.set(shroom_pos[0], 0.0, shroom_pos[1]);
   grid[row][col] = shroom_clone;

@@ -11,9 +11,11 @@ import {
 } from "entities";
 // NOTE: have the centipede shoot a shot when it turns down?
 
+const score = document.getElementById("score");
 //set_walls();
 console.log(grid);
 
+let player;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('skyblue');
@@ -24,9 +26,9 @@ const cameraTopDownPersp = new THREE.PerspectiveCamera( 100, canvas.clientWidth/
 const cameraTopDownOrtho = new THREE.OrthographicCamera( -grid_size[0] / 2.0, grid_size[0] / 2.0, grid_size[1] / 2.0,  -grid_size[1] / 2.0);
 cameraTopDownOrtho.position.set(grid_size[0] / 2.0, 10.0, -grid_size[1] / 2.0);
 cameraTopDownOrtho.lookAt(grid_size[0] / 2.0, 0.0, -grid_size[1] / 2.0);
-cameraTopDownPersp.position.set(grid_size[0] / 2.0, 10.0, -grid_size[1] / 2.0);
+cameraTopDownPersp.position.set(grid_size[0] / 2.0, 10.0, 2.0);
 cameraTopDownPersp.lookAt(grid_size[0] / 2.0, 0.0, -grid_size[1] / 2.0);
-let camera = cameraTopDownOrtho;
+let camera = cameraTopDownPersp;
 
 // Bæta við músarstýringu
 //const controls = new THREE.OrbitControls( camera, canvas );
@@ -44,17 +46,8 @@ const maxAniso = renderer.capabilities.getMaxAnisotropy();
 //            floorTexture.anisotropy = maxAniso;
 
 
-make_floor(grid_size, floorTexture, scene);
-const player = make_player(player_start_pos, cameraFP, scene);
-spawn_shroom(3, 2, scene);
-spawn_centipede(8, 2, 4, [-1,0], scene);
-//set_turn(5, 2, [0, -1]);
+reset_level();
 
-// Skilgreina ljósgjafa og bæta honum í sviðsnetið
-const light = new THREE.PointLight(0xFFFFFF, 100);
-light.position.set(grid_size[0] / 2.0, 1, -grid_size[1] / 2.0);
-//light.target.position.set(0, 0, 0);
-scene.add(light);
 
 let pause = false;
 let player_dir = [0, 0];
@@ -81,8 +74,11 @@ window.addEventListener("keydown", function(e){
   case 32: // space
     fire_bullet = true;
     break;
-  case 88: // x?
+  case 88: // x
     pause = !pause;
+    break;
+  case 89: // y
+    reset_level();
     break;
   }
 });
@@ -118,7 +114,7 @@ const animate = function (timestamp) {
       const new_player_pos_z = player.position.z + player_dir[1] * player_speed;
       const collided_area_pos = collide_area(new_player_pos_x, new_player_pos_z);
 
-      const collided_shroom_pos = collide_shroom(player.position.x, player.position.z, collided_area_pos[0], collided_area_pos[1], null);
+      const collided_shroom_pos = collide_shroom_box(player.position.x, player.position.z, collided_area_pos[0], collided_area_pos[1]);
 
       player.position.x = collided_shroom_pos[0];
       player.position.z = collided_shroom_pos[1];
@@ -151,16 +147,18 @@ const animate = function (timestamp) {
               console.log(seg.userData.prev_segment);
               const prev_seg = seg.userData.prev_segment;
               prev_seg.userData.next_segment = null;
+              update_score(10);
             } else {
               // If we hit a head segment then remove it from list of centipedes
               centipedes.delete(seg);
+              update_score(100);
             }
 
             scene.remove(seg);
 
             // Spawn a mushroom in place of the segment
             const seg_cell = xz_to_cr(seg.position.x, seg.position.z);
-            spawn_shroom(seg_cell[0], seg_cell[1], scene);
+            spawn_shroom(seg_cell[0], seg_cell[1], 0, scene);
 
             // If we hit a non-end segment then replace next segment with head
             if(seg.userData.next_segment !== null) {
@@ -171,7 +169,7 @@ const animate = function (timestamp) {
               new_head.userData.head = new_head;
               
               const next_next_seg = next_seg.userData.next_segment;
-              next_next_seg.userData.prev_segment = new_head;
+              if(next_next_seg !== null) next_next_seg.userData.prev_segment = new_head;
               scene.remove(next_seg);
               scene.add(new_head);
               centipedes.add(new_head);
@@ -187,13 +185,27 @@ const animate = function (timestamp) {
 
                 seg_to_adjust = seg_to_adjust.userData.next_segment;
               }
-
-
             }
-
-            console.log("bullet strike!");
           }
           seg = seg.userData.next_segment;
+        }
+      }
+
+      // Check collision against mushrooms
+      const bullet_cell = xz_to_cr(bullet.position.x, bullet.position.z);
+      if( !is_out_of_bounds(bullet_cell)                &&
+          grid[bullet_cell[1]][bullet_cell[0]] !== null && 
+          grid[bullet_cell[1]][bullet_cell[0]].userData.type == 'm') 
+      {
+        bullets.delete(bullet);
+        scene.remove(bullet);
+        let shroom = grid[bullet_cell[1]][bullet_cell[0]];
+        grid[bullet_cell[1]][bullet_cell[0]] = null;
+        const shroom_level = shroom.userData.dir[0];
+        scene.remove(shroom);
+        spawn_shroom(bullet_cell[0], bullet_cell[1], shroom_level + 1, scene);
+        if(shroom_level == 3) {
+          update_score(1);
         }
       }
     }
@@ -224,89 +236,114 @@ function collide_shroom(old_pos_x, old_pos_z, new_pos_x, new_pos_z, dir) {
   // NOTE: does not handle multiple shrooms
   let pos = [new_pos_x, new_pos_z];
   let cell = xz_to_cr(new_pos_x, new_pos_z);
+
+  // Check the 9 cells surrounding new cell
   for(let col = -1; col <= 1; ++col) {
-    if(cell[0] + col < 0 || cell[0] + col >= grid_size[0]) continue;
+    if(is_out_of_bounds([cell[0] + col, cell[1]])) continue;
+    //if(cell[0] + col < 0 || cell[0] + col >= grid_size[0]) continue;
     for(let row = -1; row <= 1; ++row) {
-      if(cell[1] + row < 0 || cell[1] + row >= grid_size[1]) continue;
+      if(is_out_of_bounds([cell[0], cell[1] + row])) continue;
+      //if(cell[1] + row < 0 || cell[1] + row >= grid_size[1]) continue;
       console.log('col: ', col, ' row: ', row, ' cell: ', cell);
       if(grid[cell[1] + row][cell[0] + col] === null) continue;
-      // we have found a cell with a mushroom
-      let shroom = grid[cell[1] + row][cell[0] + col];
-      let dist = Math.sqrt((new_pos_x - shroom.position.x)**2 + (new_pos_z - shroom.position.z)**2);
-      let old_dist = Math.sqrt((old_pos_x - shroom.position.x)**2 + (old_pos_z - shroom.position.z)**2)
-      console.log('old dist: ', old_dist, ' new dist: ', dist, ' 2*shroom_radius: ', 2*shroom_radius);
-      if(dist > 2*shroom_radius) continue;
-      dist = (old_pos_x - shroom.position.x)**2 + (new_pos_z - shroom.position.z)**2
-      if(dist > 2*shroom_radius) return [old_pos_x, new_pos_z];
-      dist = (new_pos_x - shroom.position.x)**2 + (old_pos_z - shroom.position.z)**2
-      if(dist > 2*shroom_radius) return [new_pos_x, old_pos_z];
-      else return [old_pos_x, old_pos_z];            
+      if(grid[cell[1] + row][cell[0] + col].userData.type === 'm') {
+        // we have found a cell with a mushroom
+        let shroom = grid[cell[1] + row][cell[0] + col];
+        let dist = Math.sqrt((new_pos_x - shroom.position.x)**2 + (new_pos_z - shroom.position.z)**2);
+        let old_dist = Math.sqrt((old_pos_x - shroom.position.x)**2 + (old_pos_z - shroom.position.z)**2)
+        console.log('old dist: ', old_dist, ' new dist: ', dist, ' 2*shroom_radius: ', 2*shroom_radius, ' cell: ', grid[cell[1] + row][cell[0] + col]);
+        if(dist > 2*shroom_radius) continue;
+        let leftover = 2*shroom_radius - dist;
+        return [old_pos_x + dir[0] * leftover, old_pos_z + dir[1] * leftover];
+        // dist = (old_pos_x - shroom.position.x)**2 + (new_pos_z - shroom.position.z)**2
+        // if(dist > 2*shroom_radius) return [old_pos_x, new_pos_z];
+        // dist = (new_pos_x - shroom.position.x)**2 + (old_pos_z - shroom.position.z)**2
+        // if(dist > 2*shroom_radius) return [new_pos_x, old_pos_z];
+        //else return [old_pos_x, old_pos_z];
+      }
     }
   }
   return pos;
 }
 
-function move_centipede(centipede) {
+function collide_shroom_box(old_pos_x, old_pos_z, new_pos_x, new_pos_z) {
+  let cell = xz_to_cr(new_pos_x, new_pos_z);
+  if(!is_out_of_bounds(cell) && grid[cell[1]][cell[0]] !== null && grid[cell[1]][cell[0]].userData.type === 'm')
+    return [old_pos_x, old_pos_z];
+  else
+    return [new_pos_x, new_pos_z];
+}
 
+function move_centipede(centipede) {
   let seg = centipede;
   while(seg !== null) {
     const old_pos_x = seg.position.x;
     const old_pos_z = seg.position.z;
+
+    const dist_to_player = dist(old_pos_x, old_pos_z, player.position.x, player.position.z);
+    if(dist_to_player < 1.0) {
+      death();
+    }
+
     let new_pos_x = seg.position.x + seg.userData.dir[0] * centipede_speed;
     let new_pos_z = seg.position.z + seg.userData.dir[1] * centipede_speed;
     const old_cell = xz_to_cr(old_pos_x, old_pos_z);
     const new_cell = xz_to_cr(new_pos_x, new_pos_z);
     const old_cell_center = cr_to_xz(old_cell[0], old_cell[1]);
     
-    // If we're the head and are crossing into a new cell...
-    if(seg.userData.head == seg && is_crossing_cells(old_cell, new_cell)) {
-      const next_cell = [new_cell[0] + seg.userData.dir[0], new_cell[1] + seg.userData.dir[1]];
-      const vert_cell = [new_cell[0], new_cell[1] - seg.userData.vert_dir];
+    // If we're crossing a cell center then we need to detect collisions and set turn points
+    if(!is_out_of_bounds(old_cell) && is_crossing_center([old_pos_x, old_pos_z], old_cell_center, [new_pos_x, new_pos_z])) {
       
-      // Get some states
-      //const heading_into_mushroom = grid[next_cell[1]][next_cell[0]] !== null && grid[next_cell[1]][next_cell[0]].userData.type === 'm';
-      const heading_laterally = seg.userData.dir[1] == 0;
-      const heading_into_obstacle = is_out_of_bounds(next_cell)                || 
-                                    (grid[next_cell[1]][next_cell[0]] !== null && 
-                                     grid[next_cell[1]][next_cell[0]].userData.type === 'm');
-
-      const vert_obstacle =         is_out_of_bounds(vert_cell)                ||
-                                    (grid[vert_cell[1]][vert_cell[0]] !== null && 
-                                     grid[vert_cell[1]][vert_cell[0]].userData.type === 'm');
-      
-      console.log('new cell: ', new_cell, ' next_cell: ', next_cell, ' vert_cell: ', vert_cell, ' heading_into_obstacle: ', heading_into_obstacle, ' vert_obstacle: ', vert_obstacle);
-      // If next cell is a mushroom and we're moving laterally then
-      // turn and put down turn tokens
-      if( heading_into_obstacle && heading_laterally) {
-        console.log('next is obstacle');
-        if(vert_obstacle) seg.userData.vert_dir *= -1;
+      // If we're the head
+      if(seg.userData.head == seg) {
+        const next_cell = [new_cell[0] + seg.userData.dir[0], new_cell[1] + seg.userData.dir[1]];
+        const vert_cell = [new_cell[0], new_cell[1] - seg.userData.vert_dir];
         
-        set_turn(new_cell[0], new_cell[1], [0, seg.userData.vert_dir]);
-        set_turn(new_cell[0], new_cell[1] - seg.userData.vert_dir, [-seg.userData.dir[0], seg.userData.dir[1]]);
-  
-      }      
-    }
+        // Get some states
+        //const heading_into_mushroom = grid[next_cell[1]][next_cell[0]] !== null && grid[next_cell[1]][next_cell[0]].userData.type === 'm';
+        const heading_laterally = seg.userData.dir[1] == 0;
+        const heading_into_obstacle = is_out_of_bounds(next_cell)                || 
+                                      (grid[next_cell[1]][next_cell[0]] !== null && 
+                                        grid[next_cell[1]][next_cell[0]].userData.type === 'm');
+
+        const vert_obstacle =         is_out_of_bounds(vert_cell)                ||
+                                      (grid[vert_cell[1]][vert_cell[0]] !== null && 
+                                        grid[vert_cell[1]][vert_cell[0]].userData.type === 'm');
+        
+        console.log('new cell: ', new_cell, ' next_cell: ', next_cell, ' vert_cell: ', vert_cell, ' heading_into_obstacle: ', heading_into_obstacle, ' vert_obstacle: ', vert_obstacle);
+        // If next cell is a mushroom and we're moving laterally then
+        // turn and put down turn tokens
+        if( heading_into_obstacle && heading_laterally) {
+          console.log('next is obstacle');
+          if(vert_obstacle) seg.userData.vert_dir *= -1;
+          
+          set_turn(new_cell[0], new_cell[1], [0, seg.userData.vert_dir]);
+          set_turn(new_cell[0], new_cell[1] - seg.userData.vert_dir, [-seg.userData.dir[0], seg.userData.dir[1]]);
     
-    // If we're crossing cell center and the cell has a turn token then we need to turn
-    if( !is_out_of_bounds(new_cell) &&
-        is_crossing_center([old_pos_x, old_pos_z], old_cell_center, [new_pos_x, new_pos_z]) &&
-        grid[new_cell[1]][new_cell[0]] !== null && grid[new_cell[1]][new_cell[0]].userData.type == 't') {
-      // Move to current cell center
-      // - Distance to cell center
-      const d_old_to_center = dist(old_pos_x, old_pos_z, old_cell_center[0], old_cell_center[1]);
-      // - Distance that we still have to move (should not be negative!)
-      const d_leftover = centipede_speed - d_old_to_center;
-      seg.position.x = old_cell_center[0];
-      seg.position.z = old_cell_center[1];
-  
-      // Turn
-      seg.userData.prev_dir = seg.userData.dir;
-      seg.userData.dir = grid[new_cell[1]][new_cell[0]].userData.dir;
-      seg.rotation.y = Math.atan2(-seg.userData.dir[1], seg.userData.dir[0]);
-  
-      // Move rest of move
-      new_pos_x = seg.position.x + seg.userData.dir[0] * d_leftover;
-      new_pos_z = seg.position.z + seg.userData.dir[1] * d_leftover;
+        }      
+      }
+      
+      // If the cell has a turn token then we need to turn
+      console.log('new_cell: ', new_cell, 'grid[new_cell[1]][new_cell[0]]', grid[new_cell[1]][new_cell[0]]);
+      if(grid[new_cell[1]][new_cell[0]] !== null && grid[new_cell[1]][new_cell[0]].userData.type == 't') {
+        // Move to current cell center
+        // - Distance to cell center
+        const d_old_to_center = dist(old_pos_x, old_pos_z, old_cell_center[0], old_cell_center[1]);
+        // - Distance that we still have to move (should not be negative!)
+        const d_leftover = centipede_speed - d_old_to_center;
+        seg.position.x = old_cell_center[0];
+        seg.position.z = old_cell_center[1];
+    
+        // Turn
+        seg.userData.prev_dir = seg.userData.dir;
+        seg.userData.dir = grid[new_cell[1]][new_cell[0]].userData.dir;
+        seg.rotation.y = Math.atan2(-seg.userData.dir[1], seg.userData.dir[0]);
+    
+        // Move rest of move
+        new_pos_x = seg.position.x + seg.userData.dir[0] * d_leftover;
+        new_pos_z = seg.position.z + seg.userData.dir[1] * d_leftover;
+      }
+
     }
 
     seg.position.x = new_pos_x;
@@ -334,5 +371,49 @@ function is_out_of_bounds(cell) {
           cell[0] < 0             ||
           cell[1] >= grid_size[1] ||
           cell[1] < 0;
+}
+
+function reset_level() {
+  while(scene.children.length > 0){ 
+    scene.remove(scene.children[0]); 
+  }
+
+  centipedes.clear();
+  bullets.clear();
+
+  grid = multi_array(grid_size[0], grid_size[1]);
+  make_floor(grid_size, floorTexture, scene);
+  player = make_player(player_start_pos, cameraFP, scene);
+  //spawn_shroom(3, 2, 0, scene);
+  spawn_centipede(6, 14, 6, [1,0], scene);
+  //set_turn(5,2, null);
+
+  let shroom_cells = [6, 1, 7, 11, 3, 8, 5, 2, 4, 14, 13, 9, 0, 12, 10];
+  for(let i = 0; i < 15; ++i) {
+    spawn_shroom(i, shroom_cells[i], 0, scene);
+  }
+
+  // Skilgreina ljósgjafa og bæta honum í sviðsnetið
+  const light = new THREE.PointLight(0xFFFFFF, 100);
+  light.position.set(grid_size[0] / 2.0, 1, -grid_size[1] / 2.0);
+  //light.target.position.set(0, 0, 0);
+  scene.add(light);
+
+  const dlight = new THREE.DirectionalLight(0xFFFFFF, 1);
+  dlight.position.set(0, 10, 0);
+  dlight.target.position.set(-5, 0, 0);
+  scene.add(dlight);
+  scene.add(dlight.target);
+}
+
+function update_score(point) {
+  points += point;
+  score.textContent = points;
+}
+
+function death() {
+  points = 0;
+  update_score(0);
+  reset_level();
 }
 
